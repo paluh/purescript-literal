@@ -6,20 +6,22 @@ import Effect (Effect)
 import Foreign (Foreign, isUndefined)
 import Literals (NumberLit, StringLit, IntLit, intLit, numberLit, stringLit)
 import Literals.Literal (Literal)
+import Literals.Record (RecordLit)
 import Literals.Reflect (class Reflect, reflect)
 import Literals.Undefined (undefined)
 import Prim.RowList (Cons, Nil) as RL
 import Prim.RowList (class RowToList, kind RowList)
+import Record (get) as Record
 import Test.Assert (assertEqual, assertTrue)
-import Type.Prelude (Proxy(..))
+import Type.Prelude (Proxy(..), SProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | I gave Literal different name for clarity
 foreign import data Def ∷ Type → Symbol → Type
 
-fromDef ∷ ∀ s t. Reflect t s ⇒ Def t s → t
+fromDef ∷ ∀ s t t'. Reflect t (SProxy s) t' ⇒ Def t s → t'
 fromDef d = if (isUndefined (unsafeCoerce d ∷ Foreign))
-  then reflect (Proxy ∷ Proxy (Literal t s))
+  then reflect (Proxy ∷ Proxy (Literal t (SProxy s)))
   else unsafeCoerce d
 
 class CoerceDef given expected
@@ -38,6 +40,13 @@ type R =
   { x ∷ Def Number "8.0"
   , y ∷ Def String "default"
   }
+
+reflectedRecord' :: Number
+reflectedRecord' =
+  let
+    r = reflect (Proxy ∷ Proxy (RecordLit (x ∷ NumberLit "8.0")))
+  in
+    r.x
 
 coerce ∷ ∀ g e. CoerceDef g e ⇒ g → e
 coerce = unsafeCoerce

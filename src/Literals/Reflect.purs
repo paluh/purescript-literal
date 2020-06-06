@@ -7,28 +7,56 @@ import Literals.Null (Null, null)
 import Literals.Number (class Number, numberLit)
 import Literals.String (stringLit)
 import Literals.Undefined (Undefined, undefined)
-import Type.Prelude (Proxy)
+import Prim.Row (class Cons, class Lacks) as R
+import Prim.RowList (Cons, Nil) as RL
+import Prim.RowList (class RowToList, kind RowList)
+import Record (insert) as Record
+import Type.Prelude (Proxy(..), RLProxy(..), SProxy(..))
+import Type.Row (RProxy)
 
-class Reflect t (s ∷ Symbol) where
-  reflect ∷ Proxy (Literal t s) → t
+class Reflect typ rep typ' | typ rep → typ' where
+  reflect ∷ Proxy (Literal typ rep) → typ'
 
-instance reflectNumber ∷ (IsSymbol s, Number s) ⇒ Reflect Number s where
-  reflect _ = toValue (numberLit ∷ Literal Number s)
+instance reflectNumber ∷ (IsSymbol s, Number s) ⇒ Reflect Number (SProxy s) Number where
+  reflect _ = toValue (numberLit ∷ Literal Number (SProxy s))
 
-instance reflectString ∷ (IsSymbol s) ⇒ Reflect String s where
-  reflect _ = toValue (stringLit ∷ Literal String s)
+instance reflectString ∷ (IsSymbol s) ⇒ Reflect String (SProxy s) String where
+  reflect _ = toValue (stringLit ∷ Literal String (SProxy s))
 
-instance reflectInt ∷ (IsSymbol s, Int s) ⇒ Reflect Int s where
-  reflect _ = toValue (intLit ∷ Literal Int s)
+instance reflectInt ∷ (IsSymbol s, Int s) ⇒ Reflect Int (SProxy s) Int where
+  reflect _ = toValue (intLit ∷ Literal Int (SProxy s))
 
-instance reflectBooleanTrue ∷ (IsSymbol s, Int s) ⇒ Reflect Boolean "true" where
+instance reflectBooleanTrue ∷ (IsSymbol s, Int s) ⇒ Reflect Boolean (SProxy "true") Boolean where
   reflect _ = true
 
-instance reflectBooleanFalse ∷ (IsSymbol s, Int s) ⇒ Reflect Boolean "false" where
+instance reflectBooleanFalse ∷ (IsSymbol s, Int s) ⇒ Reflect Boolean (SProxy "false") Boolean where
   reflect _ = false
 
-instance reflectNull ∷ (IsSymbol s) ⇒ Reflect Null s where
+instance reflectNull ∷ Reflect Null any Null where
   reflect _ = null
 
-instance reflectUndefined ∷ (IsSymbol s) ⇒ Reflect Undefined s where
+instance reflectUndefined ∷ Reflect Undefined any Undefined where
   reflect _ = undefined
+
+instance reflectRecord ∷ (RowToList r rl, ReflectRL rl r') ⇒ Reflect (RProxy r) (RProxy r) (Record r') where
+  reflect _ = reflectRL (RLProxy ∷ RLProxy rl)
+
+class ReflectRL (rl ∷ RowList) (r ∷ #Type) | rl → r where
+  reflectRL ∷ (RLProxy rl) → { | r }
+
+instance reflectRLNil ∷ ReflectRL RL.Nil () where
+  reflectRL _ = { }
+
+instance reflectRLCons
+  ∷ ( Reflect typ rep typ'
+    , ReflectRL tail r'
+    , R.Cons n typ' r' r''
+    , IsSymbol n
+    , R.Lacks n r'
+    )
+  ⇒ ReflectRL (RL.Cons n (Literal typ rep) tail) r'' where
+  reflectRL _ = Record.insert
+    (SProxy ∷ SProxy n)
+    (reflect (Proxy ∷ Proxy (Literal typ rep)))
+    (reflectRL (RLProxy ∷ RLProxy tail))
+

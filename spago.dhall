@@ -13,6 +13,7 @@ You can edit this file as you like.
     , "numbers"
     , "partial"
     , "psci-support"
+    , "record"
     , "unsafe-coerce"
     , "typelevel-prelude"
     ]

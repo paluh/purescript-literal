@@ -39,7 +39,7 @@ else instance lastFractionalPart :: (Digit h) => Number' h "" FractionalPart
 else instance digitIntegerPart :: (Digit h, Cons h' t' t, Number' h' t' IntegerPart) => Number' h t IntegerPart
 else instance digitFractionalPart :: (Digit h, Cons h' t' t, Number' h' t' FractionalPart) => Number' h t FractionalPart
 
-type NumberLit sym = Literal Number sym
+type NumberLit sym = Literal Number (SProxy sym)
 
 numberLit :: forall sym. IsSymbol sym => Number sym => NumberLit sym
 numberLit = unsafeCoerce $ unsafePartial $ fromJust $ fromString $ reflectSymbol (SProxy :: SProxy sym)
