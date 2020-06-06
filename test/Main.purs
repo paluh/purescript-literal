@@ -87,7 +87,13 @@ type ExampeRecord = { | ExampleRow }
 
 rLenses = lenses (RProxy ∷ RProxy ExampleRow)
 
+-- | Type signatures here are optional. Only informative reasons ;-)
+
+getX :: String
 getX = view (unWrap rLenses.x) { x: "test", y: 2 }
+
+getX' :: { x :: String , y :: Int } -> String
+getX' = view (unWrap rLenses.x)
 
 
 reflectedRecord' :: Number
