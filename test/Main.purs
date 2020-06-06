@@ -64,8 +64,6 @@ instance evalPropExpr ∷ Eval (Prop r s a) (TypeExprProxy (Prop r s a))
 -- | directly so I'm wrapping it here.
 newtype LensWrapper a r = LensWrapper (∀ p. Strong p ⇒ p a a → p r r)
 
--- | I'm not able to use Lens alias here - I have to use its
--- | function signature and constraint directly
 instance reflectProp
   ∷ (IsSymbol s, Row.Cons s a r' r)
   ⇒ Reflect (TypeExprProxy (Prop r (SProxy s) a)) (LensWrapper a { | r }) where
