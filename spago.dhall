@@ -10,11 +10,13 @@ You can edit this file as you like.
     , "console"
     , "foreign"
     , "integers"
+    , "profunctor-lenses"
     , "numbers"
     , "partial"
     , "psci-support"
     , "record"
     , "unsafe-coerce"
+    , "typelevel-eval"
     , "typelevel-prelude"
     ]
 , packages =

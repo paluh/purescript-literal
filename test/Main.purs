@@ -2,6 +2,11 @@ module Test.Main where
 
 import Prelude
 
+import Data.Lens (Lens, Lens', Optic, view)
+import Data.Lens.Record (prop) as Lens
+import Data.Newtype (class Newtype, unwrap)
+import Data.Profunctor.Strong (class Strong)
+import Data.Symbol (class IsSymbol)
 import Effect (Effect)
 import Foreign (Foreign, isUndefined)
 import Literals (NumberLit, StringLit, IntLit, intLit, numberLit, stringLit)
@@ -9,17 +14,22 @@ import Literals.Literal (Literal)
 import Literals.Record (RecordLit)
 import Literals.Reflect (class Reflect, reflect)
 import Literals.Undefined (undefined)
+import Prim.Row (class Cons) as Row
 import Prim.RowList (Cons, Nil) as RL
 import Prim.RowList (class RowToList, kind RowList)
 import Record (get) as Record
 import Test.Assert (assertEqual, assertTrue)
-import Type.Prelude (Proxy(..), SProxy(..))
+import Type.Eval (class Eval, kind TypeExpr)
+import Type.Eval.Function (type (<<<))
+import Type.Eval.Functor (MapWithIndex)
+import Type.Eval.RowList (FromRow, ToRow)
+import Type.Prelude (Proxy(..), RProxy(..), SProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
--- | I gave Literal different name for clarity
+-- | An example implementation for default values on the type level
 foreign import data Def ∷ Type → Symbol → Type
 
-fromDef ∷ ∀ s t t'. Reflect t (SProxy s) t' ⇒ Def t s → t'
+fromDef ∷ ∀ s t t'. Reflect (Literal t (SProxy s)) t' ⇒ Def t s → t'
 fromDef d = if (isUndefined (unsafeCoerce d ∷ Foreign))
   then reflect (Proxy ∷ Proxy (Literal t (SProxy s)))
   else unsafeCoerce d
@@ -40,6 +50,45 @@ type R =
   { x ∷ Def Number "8.0"
   , y ∷ Def String "default"
   }
+
+
+-- | An dirty example for generation record with lenses for a given record
+
+foreign import data TypeExprProxy ∷ TypeExpr → Type
+
+foreign import data Prop ∷ (# Type) → Type → Type → TypeExpr
+
+instance evalPropExpr ∷ Eval (Prop r s a) (TypeExprProxy (Prop r s a))
+
+-- | I have problem with generation of rank-2 lens function in `Reflect`
+-- | directly so I'm wrapping it here.
+newtype LensWrapper a r = LensWrapper (∀ p. Strong p ⇒ p a a → p r r)
+
+-- | I'm not able to use Lens alias here - I have to use its
+-- | function signature and constraint directly
+instance reflectProp
+  ∷ (IsSymbol s, Row.Cons s a r' r)
+  ⇒ Reflect (TypeExprProxy (Prop r (SProxy s) a)) (LensWrapper a { | r }) where
+  reflect _ = LensWrapper (Lens.prop (SProxy ∷ SProxy s))
+
+type ToProps r = ToRow <<< MapWithIndex (Prop r) <<< FromRow
+
+lenses ∷ ∀ lenses props r. Eval (ToProps r (RProxy r)) (RProxy props) ⇒ Reflect (RecordLit props) lenses ⇒ RProxy r → lenses
+lenses _ = reflect (Proxy ∷ Proxy (RecordLit props))
+
+unWrap (LensWrapper l) = l
+
+type ExampleRow =
+  ( x ∷ String
+  , y ∷ Int
+  )
+
+type ExampeRecord = { | ExampleRow }
+
+rLenses = lenses (RProxy ∷ RProxy ExampleRow)
+
+getX = view (unWrap rLenses.x) { x: "test", y: 2 }
+
 
 reflectedRecord' :: Number
 reflectedRecord' =
