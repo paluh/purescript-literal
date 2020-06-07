@@ -2,14 +2,12 @@ module Test.Main where
 
 import Prelude
 
-import Data.Lens (Lens, Lens', Optic, set, view)
+import Data.Lens (set, view)
 import Data.Lens.Record (prop) as Lens
-import Data.Newtype (class Newtype, unwrap)
 import Data.Profunctor.Strong (class Strong)
 import Data.Symbol (class IsSymbol)
 import Effect (Effect)
 import Foreign (Foreign, isUndefined)
-import Heterogeneous.Mapping (class HMapWithIndex, class MappingWithIndex, hmapWithIndex)
 import Literals (NumberLit, StringLit, IntLit, intLit, numberLit, stringLit)
 import Literals.Literal (Literal)
 import Literals.Record (RecordLit)
@@ -18,7 +16,6 @@ import Literals.Undefined (undefined)
 import Prim.Row (class Cons) as Row
 import Prim.RowList (Cons, Nil) as RL
 import Prim.RowList (class RowToList, kind RowList)
-import Record (get) as Record
 import Test.Assert (assertEqual, assertTrue)
 import Type.Eval (class Eval, kind TypeExpr)
 import Type.Eval.Function (type (<<<))
@@ -57,9 +54,9 @@ type R =
 
 foreign import data TypeExprProxy ∷ TypeExpr → Type
 
-foreign import data Prop ∷ (Type → Type → Type) → # Type → Type → Type → TypeExpr
+foreign import data Prop ∷ (Type → Type → Type) → Type → Type → TypeExpr
 
-instance evalPropExpr ∷ Eval (Prop prof s l a) (TypeExprProxy (Prop prof s l a))
+instance evalPropExpr ∷ Eval (Prop prof l x) (TypeExprProxy (Prop prof l x))
 
 
 
@@ -67,13 +64,13 @@ instance evalPropExpr ∷ Eval (Prop prof s l a) (TypeExprProxy (Prop prof s l a
 -- | directly so I'm wrapping it here.
 
 instance reflectProp
-  ∷ (IsSymbol l, Row.Cons l d t' t, Row.Cons l c t' v, Strong prof)
-  ⇒ Reflect (TypeExprProxy (Prop prof s (SProxy l) a)) (prof c d → prof { | v } { | t }) where
+  ∷ (IsSymbol l, Row.Cons l a s_ s, Row.Cons l b s_ t, Strong prof)
+  ⇒ Reflect (TypeExprProxy (Prop prof (SProxy l) x)) (prof a b → prof { | s } { | t }) where
   reflect _ = Lens.prop (SProxy ∷ SProxy l)
 
-type ToProps prof row = ToRow <<< MapWithIndex (Prop prof row) <<< FromRow ∷ Type → TypeExpr
+type ToProps prof = ToRow <<< MapWithIndex (Prop prof) <<< FromRow ∷ Type → TypeExpr
 
-lenses ∷ ∀ lenses prof props profunctor s. Strong prof ⇒ Eval (ToProps prof s (RProxy s)) (RProxy props) ⇒ Reflect (RecordLit props) lenses ⇒ RProxy s → lenses
+lenses ∷ ∀ lenses prof props profunctor s. Strong prof ⇒ Eval (ToProps prof (RProxy s)) (RProxy props) ⇒ Reflect (RecordLit props) lenses ⇒ RProxy s → lenses
 lenses _ = reflect (Proxy ∷ Proxy (RecordLit props))
 
 type ExampleRow =
