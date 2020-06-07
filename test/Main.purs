@@ -2,7 +2,7 @@ module Test.Main where
 
 import Prelude
 
-import Data.Lens (Lens, Lens', Optic, view)
+import Data.Lens (Lens, Lens', Optic, set, view)
 import Data.Lens.Record (prop) as Lens
 import Data.Newtype (class Newtype, unwrap)
 import Data.Profunctor.Strong (class Strong)
@@ -22,6 +22,7 @@ import Record (get) as Record
 import Test.Assert (assertEqual, assertTrue)
 import Type.Eval (class Eval, kind TypeExpr)
 import Type.Eval.Function (type (<<<))
+import Type.Eval.Functor (MapWithIndex)
 import Type.Eval.RowList (FromRow, ToRow)
 import Type.Prelude (Proxy(..), RLProxy(..), RProxy(..), SProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -56,41 +57,24 @@ type R =
 
 foreign import data TypeExprProxy ∷ TypeExpr → Type
 
-foreign import data Prop ∷ Type → Type → Type → Type → TypeExpr
+foreign import data Prop ∷ (Type → Type → Type) → # Type → Type → Type → TypeExpr
 
-instance evalPropExpr ∷ Eval (Prop s t_ l a) (TypeExprProxy (Prop s t_ l a))
+instance evalPropExpr ∷ Eval (Prop prof s l a) (TypeExprProxy (Prop prof s l a))
 
-
-foreign import data MapWithIndex' ∷ Type → (Type → Type → Type → TypeExpr) → Type → TypeExpr
-
-instance mapWithIndex_RowList_Cons' ::
-  ( Eval (fn (RProxy orig_) (SProxy sym) a) b
-  , Row.Cons sym a orig_ orig
-  , Eval (MapWithIndex' (RProxy orig) fn (RLProxy rl)) (RLProxy rl')
-  ) =>
-  Eval (MapWithIndex' (RProxy orig) fn (RLProxy (RL.Cons sym a rl))) (RLProxy (RL.Cons sym b rl'))
-
-instance mapWithIndex_RowList_Nil' ::
-  Eval (MapWithIndex' orig fn (RLProxy RL.Nil)) (RLProxy RL.Nil)
 
 
 -- | I have problem with generation of rank-2 lens function in `Reflect`
 -- | directly so I'm wrapping it here.
-newtype LensWrapper a b s t = LensWrapper (∀ p. Strong p ⇒ p a b → p s t)
 
 instance reflectProp
-  ∷ (IsSymbol l, Row.Cons l b t_ t, Row.Cons l a t_ s)
-  ⇒ Reflect (TypeExprProxy (Prop (RProxy s) (RProxy t_) (SProxy l) a)) (LensWrapper a b { | s } { | t }) where
-  reflect _ = LensWrapper (Lens.prop (SProxy ∷ SProxy l))
+  ∷ (IsSymbol l, Row.Cons l d t' t, Row.Cons l c t' v, Strong prof)
+  ⇒ Reflect (TypeExprProxy (Prop prof s (SProxy l) a)) (prof c d → prof { | v } { | t }) where
+  reflect _ = Lens.prop (SProxy ∷ SProxy l)
 
-type X s = MapWithIndex' s (Prop s) ∷ Type → TypeExpr
+type ToProps prof row = ToRow <<< MapWithIndex (Prop prof row) <<< FromRow ∷ Type → TypeExpr
 
-type ToProps s = ToRow <<< (X s) <<< FromRow ∷ Type → TypeExpr
-
-lenses ∷ ∀ lenses props s. Eval (ToProps (RProxy s) (RProxy s)) (RProxy props) ⇒ Reflect (RecordLit props) lenses ⇒ RProxy s → lenses
+lenses ∷ ∀ lenses prof props profunctor s. Strong prof ⇒ Eval (ToProps prof s (RProxy s)) (RProxy props) ⇒ Reflect (RecordLit props) lenses ⇒ RProxy s → lenses
 lenses _ = reflect (Proxy ∷ Proxy (RecordLit props))
-
-unWrapLens (LensWrapper l) = l
 
 type ExampleRow =
   ( x ∷ String
@@ -99,36 +83,18 @@ type ExampleRow =
 
 -- -- | Type signatures here are optional. They are here only for informative reasons ;-)
 
-rLenses ∷ ∀ t49 t54.
-   { x ∷ LensWrapper
-      String
-      t49
-      { x ∷ String
-      , y ∷ Int
-      }
-      { x ∷ t49
-      , y ∷ Int
-      }
-   , y ∷ LensWrapper
-      Int
-      t54
-      { x ∷ String
-      , y ∷ Int
-      }
-      { x ∷ String
-      , y ∷ t54
-      }
-   }
 rLenses = lenses (RProxy ∷ RProxy ExampleRow)
 
 
--- | Usage - unfortunatelly I'm not able to drop LensWrapper
-
 getX ∷ String
-getX = view (unWrapLens rLenses.x) { x: "test", y: 2 }
+getX =
+  let
+    r = { x: "test", y: 2 }
+  in
+    view rLenses.x r <> show (view rLenses.y (set rLenses.y 8.0 r))
 
 getX' ∷ { x ∷ String , y ∷ Int } → String
-getX' = view (unWrapLens rLenses.x)
+getX' = view rLenses.x
 
 
 reflectedRecord' ∷ Number
