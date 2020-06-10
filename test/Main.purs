@@ -4,11 +4,13 @@ import Prelude
 
 import Data.Lens (set, view)
 import Data.Lens.Record (prop) as Lens
+import Data.Maybe (Maybe(..))
 import Data.Profunctor.Strong (class Strong)
 import Data.Symbol (class IsSymbol)
 import Effect (Effect)
 import Foreign (Foreign, isUndefined)
 import Literals (NumberLit, StringLit, IntLit, intLit, numberLit, stringLit)
+import Literals.Generic (ArgumentLit, GenericLit, NoArgumentsLit)
 import Literals.Literal (Literal)
 import Literals.Record (RecordLit)
 import Literals.Reflect (class Reflect, reflect)
@@ -34,7 +36,7 @@ fromDef d = if (isUndefined (unsafeCoerce d ∷ Foreign))
 
 class CoerceDef given expected
 
-instance coerceDef ∷ (CoerceDef a b) ⇒ CoerceDef a (Def b s)
+instance coerceDefBase ∷ (CoerceDef a b) ⇒ CoerceDef a (Def b s)
 else instance coerceRercords ∷ (RowToList g gl, RowToList e el, CoerceDefRL gl el) ⇒ CoerceDef { | g } { | e }
 else instance coerceValue ∷ CoerceDef a a
 
@@ -49,6 +51,9 @@ type R =
   , y ∷ Def String "default"
   }
 
+coerceDef ∷ ∀ g e. CoerceDef g e ⇒ g → e
+coerceDef = unsafeCoerce
+
 
 -- | An __really dirty__ example for generation record with lenses for a given record
 
@@ -58,11 +63,6 @@ foreign import data Prop ∷ (Type → Type → Type) → Type → Type → Type
 
 instance evalPropExpr ∷ Eval (Prop prof l x) (TypeExprProxy (Prop prof l x))
 
-
-
--- | I have problem with generation of rank-2 lens function in `Reflect`
--- | directly so I'm wrapping it here.
-
 instance reflectProp
   ∷ (IsSymbol l, Row.Cons l a s_ s, Row.Cons l b s_ t, Strong prof)
   ⇒ Reflect (TypeExprProxy (Prop prof (SProxy l) x)) (prof a b → prof { | s } { | t }) where
@@ -70,7 +70,7 @@ instance reflectProp
 
 type ToProps prof = ToRow <<< MapWithIndex (Prop prof) <<< FromRow ∷ Type → TypeExpr
 
-lenses ∷ ∀ lenses prof props profunctor s. Strong prof ⇒ Eval (ToProps prof (RProxy s)) (RProxy props) ⇒ Reflect (RecordLit props) lenses ⇒ RProxy s → lenses
+lenses ∷ ∀ lenses prof props s. Strong prof ⇒ Eval (ToProps prof (RProxy s)) (RProxy props) ⇒ Reflect (RecordLit props) lenses ⇒ RProxy s → lenses
 lenses _ = reflect (Proxy ∷ Proxy (RecordLit props))
 
 type ExampleRow =
@@ -78,10 +78,7 @@ type ExampleRow =
   , y ∷ Int
   )
 
--- -- | Type signatures here are optional. They are here only for informative reasons ;-)
-
 rLenses = lenses (RProxy ∷ RProxy ExampleRow)
-
 
 getX ∷ String
 getX =
@@ -101,13 +98,24 @@ reflectedRecord' =
   in
     r.x
 
-coerce ∷ ∀ g e. CoerceDef g e ⇒ g → e
-coerce = unsafeCoerce
-
 main ∷ Effect Unit
 main = do
   let
-    r = coerce { y: "non default" } ∷ R
+    x = reflect (Proxy ∷ Proxy (GenericLit (Maybe Int) "Nothing" (NoArgumentsLit)))
+  assertEqual
+    { actual: x
+    , expected: Nothing
+    }
+
+  let
+    y = reflect (Proxy ∷ Proxy (GenericLit (Maybe Int) "Just" (ArgumentLit (IntLit "8"))))
+  assertEqual
+    { actual: y
+    , expected: Just 8
+    }
+
+  let
+    r = coerceDef { y: "non default" } ∷ R
   assertEqual
     { actual: fromDef r.x
     , expected: 8.0
