@@ -9,6 +9,7 @@ You can edit this file as you like.
     , "effect"
     , "console"
     , "foreign"
+    , "generics-rep"
     , "heterogeneous"
     , "integers"
     , "profunctor-lenses"

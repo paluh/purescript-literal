@@ -47,7 +47,7 @@ else instance signPartEmpty :: (Int' h t IntegerPart) => Int' h t Sign
 else instance lastIntegerPart :: (Digit h) => Int' h "" IntegerPart
 else instance digitIntegerPart :: (Digit h, Cons h' t' t, Int' h' t' IntegerPart) => Int' h t IntegerPart
 
-type IntLit sym = Literal Int (SProxy sym)
+type IntLit sym = Literal Int sym
 
 intLit :: forall sym. IsSymbol sym => Int sym => IntLit sym
 intLit = unsafeCoerce $ unsafePartial $ fromJust $ fromString $ reflectSymbol (SProxy :: SProxy sym)

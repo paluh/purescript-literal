@@ -21,15 +21,15 @@ import Type.Eval (class Eval, kind TypeExpr)
 import Type.Eval.Function (type (<<<))
 import Type.Eval.Functor (MapWithIndex)
 import Type.Eval.RowList (FromRow, ToRow)
-import Type.Prelude (Proxy(..), RLProxy(..), RProxy(..), SProxy(..))
+import Type.Prelude (Proxy(..), RProxy(..), SProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | An example implementation for default values on the type level
 foreign import data Def ∷ Type → Symbol → Type
 
-fromDef ∷ ∀ s t t'. Reflect (Literal t (SProxy s)) t' ⇒ Def t s → t'
+fromDef ∷ ∀ s t t'. Reflect (Literal t s) t' ⇒ Def t s → t'
 fromDef d = if (isUndefined (unsafeCoerce d ∷ Foreign))
-  then reflect (Proxy ∷ Proxy (Literal t (SProxy s)))
+  then reflect (Proxy ∷ Proxy (Literal t s))
   else unsafeCoerce d
 
 class CoerceDef given expected

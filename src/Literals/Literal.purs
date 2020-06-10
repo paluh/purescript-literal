@@ -4,7 +4,7 @@ import Prelude
 
 import Unsafe.Coerce (unsafeCoerce)
 
-foreign import data Literal :: Type -> Type -> Type
+foreign import data Literal :: Type -> Symbol -> Type
 
 instance literalEq :: Eq (Literal typ rep) where
   eq _ _ = true
