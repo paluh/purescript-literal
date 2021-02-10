@@ -1,13 +1,13 @@
 module Test.RunCodegen where
 
-import Data.Generic.Rep (class Generic, Argument(..), Constructor(..), Sum(..))
-import Prelude (Unit, identity, ($))
 import Control.Monad.Free (Free, liftF)
 import Data.Functor.Variant (FProxy(..))
+import Data.Generic.Rep (class Generic, Argument(..), Constructor(..), Product(..), Sum(..))
 import Data.Generic.Rep (to) as Generics.Rep
 import Data.Symbol (class IsSymbol)
+import Prelude (Unit, identity, ($))
 import Prim.Row (class Cons, class Lacks) as Row
-import Record (get, insert) as Record
+import Record (insert) as Record
 import Type.Prelude (SProxy(..))
 import Type.Proxy (Proxy(..))
 
@@ -39,7 +39,28 @@ else instance reconstructGenericInr ∷
 class GenericFreeConstructor (t ∷ Type → Type) g (p ∷ ConstructorPath) rin rout | t g → rin rout p where
   genericFreeConstructor :: FProxy t → Proxy g → PProxy p → { | rin } → { | rout }
 
-instance genericFreeConstructorSingleFunArg ::
+instance genericFreeConstructorSum ::
+  ( GenericFreeConstructor t l (Inl p) rin lout
+  , GenericFreeConstructor t r (Inr p) lout rout
+  ) =>
+  GenericFreeConstructor t (Sum l r) p rin rout where
+  genericFreeConstructor fp _ _ rin = rout
+    where
+    lout = genericFreeConstructor fp (Proxy ∷ Proxy l) (PProxy ∷ PProxy (Inl p)) rin
+
+    rout = genericFreeConstructor fp (Proxy ∷ Proxy r) (PProxy ∷ PProxy (Inr p)) lout
+else instance genericFreeConstructorTwoFunArgs ::
+  ( IsSymbol name
+  , Row.Cons name (a -> Free t args) rin rout
+  , Row.Lacks name rin
+  , ReconstructGeneric p (Constructor name (Product (Argument a) (Argument (args → args)))) g'
+  , Generic (t args) g'
+  ) =>
+  GenericFreeConstructor t (Constructor name (Product (Argument a) (Argument (args' → Unit)))) p rin rout where
+  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
+    where
+    f a = liftF $ (Generics.Rep.to (reconstructGeneric p ((Constructor (Product (Argument a) (Argument identity))) ∷ Constructor name (Product (Argument a) (Argument (args → args))))) ∷ t args)
+else instance genericFreeConstructorSingleFunArg ::
   ( IsSymbol name
   , Row.Cons name (Free t args) rin rout
   , Row.Lacks name rin
@@ -50,24 +71,17 @@ instance genericFreeConstructorSingleFunArg ::
   genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
     where
     f = liftF $ (Generics.Rep.to (reconstructGeneric p ((Constructor (Argument identity)) ∷ Constructor name (Argument (args → args)))) ∷ t args)
-else instance genericFreeConstructorSum ::
-  ( GenericFreeConstructor t l (Inl p) rin lout
-  , GenericFreeConstructor t r (Inr p) lout rout
-  ) =>
-  GenericFreeConstructor t (Sum l r) p rin rout where
-  genericFreeConstructor fp _ _ rin = rout
-    where
-    lout = genericFreeConstructor fp (Proxy ∷ Proxy l) (PProxy ∷ PProxy (Inl p)) rin
-
-    rout = genericFreeConstructor fp (Proxy ∷ Proxy r) (PProxy ∷ PProxy (Inr p)) lout
 
 constructors ∷ ∀ g rout t. Generic (t Unit) g ⇒ GenericFreeConstructor t g Top () rout ⇒ FProxy t → { | rout }
 constructors fp = genericFreeConstructor fp (Proxy ∷ Proxy g) (PProxy ∷ PProxy Top) {}
 
 -- | Functor definition
 data S3SquirrelProgramF a
-  = GenerateUUID (String -> a)
-  | GetRandomInt (Int -> a)
+  = GetETagHeaderForResource String (String -> a)
+  -- | DownloadResourceToFile String String a
+  -- | ReadFileToBuffer String (Buffer -> a)
+  -- | UploadObjectToS3 String String Buffer a
+  | GenerateUUID (String -> a)
 
 -- | `Generic` instance is required
 derive instance genericS3SquirrelProgramF ∷ Generic (S3SquirrelProgramF a) _
@@ -75,6 +89,6 @@ derive instance genericS3SquirrelProgramF ∷ Generic (S3SquirrelProgramF a) _
 -- | This signature is optional
 y ::
   { "GenerateUUID" :: Free S3SquirrelProgramF String
-  , "GetRandomInt" :: Free S3SquirrelProgramF Int
+  , "GetETagHeaderForResource" :: String -> Free S3SquirrelProgramF String
   }
 y = (constructors (FProxy ∷ FProxy S3SquirrelProgramF))
