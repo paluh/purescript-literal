@@ -9,6 +9,7 @@ You can edit this file as you like.
     , "effect"
     , "console"
     , "foreign"
+    , "free"
     , "generics-rep"
     , "heterogeneous"
     , "integers"

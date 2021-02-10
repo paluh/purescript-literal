@@ -40,4 +40,3 @@ instance reflectNoArgumentsLit ∷ Reflect NoArgumentsLit NoArguments where
 
 
 
--- test/Main.purs|106 col 5 error| 106:87:  No type class instance was found for Literals.Generic.ReflectGeneric (Constructor "Just" (Argument Int)) "Just" (ArgumentLit (Literal Int "8")) while applying a function reflect of type Reflect t0 t1 => Proxy t0 -> t1 to argument Proxy while checking that expression reflect Proxy has type Maybe Int in value declaration y where t0 is an unknown type t1 is an unknown type
