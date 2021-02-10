@@ -61,14 +61,16 @@ else instance genericFreeConstructorSum ::
 
     rout = genericFreeConstructor fp (Proxy ∷ Proxy r) (PProxy ∷ PProxy (Inr p)) lout
 
+constructors ∷ ∀ g rout t. Generic (t Unit) g ⇒ GenericFreeConstructor t g Top () rout ⇒ FProxy t → { | rout }
+constructors fp = genericFreeConstructor fp (Proxy ∷ Proxy g) (PProxy ∷ PProxy Top) {}
+
+-- | Functor definition
 data S3SquirrelProgramF a
   = GenerateUUID (String -> a)
   | GetRandomInt (Int -> a)
 
+-- | `Generic` instance is required
 derive instance genericS3SquirrelProgramF ∷ Generic (S3SquirrelProgramF a) _
-
-constructors ∷ ∀ g rout t. Generic (t Unit) g ⇒ GenericFreeConstructor t g Top () rout ⇒ FProxy t → { | rout }
-constructors fp = genericFreeConstructor fp (Proxy ∷ Proxy g) (PProxy ∷ PProxy Top) {}
 
 -- | This signature is optional
 y ::
