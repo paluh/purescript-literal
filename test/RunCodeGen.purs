@@ -5,7 +5,7 @@ import Data.Functor.Variant (FProxy(..))
 import Data.Generic.Rep (class Generic, Argument(..), Constructor(..), Product(..), Sum(..))
 import Data.Generic.Rep (to) as Generics.Rep
 import Data.Symbol (class IsSymbol)
-import Prelude (Unit, identity, ($))
+import Prelude (Unit, identity, unit, ($))
 import Prim.Row (class Cons, class Lacks) as Row
 import Record (insert) as Record
 import Type.Prelude (SProxy(..))
@@ -49,7 +49,7 @@ instance genericFreeConstructorSum ::
     lout = genericFreeConstructor fp (Proxy ∷ Proxy l) (PProxy ∷ PProxy (Inl p)) rin
 
     rout = genericFreeConstructor fp (Proxy ∷ Proxy r) (PProxy ∷ PProxy (Inr p)) lout
-else instance genericFreeConstructorTwoFunArgs ::
+else instance genericFreeConstructorSingleParamEff ::
   ( IsSymbol name
   , Row.Cons name (a → Free t args) rin rout
   , Row.Lacks name rin
@@ -60,7 +60,7 @@ else instance genericFreeConstructorTwoFunArgs ::
   genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
     where
     f a = liftF $ (Generics.Rep.to (reconstructGeneric p ((Constructor (Product (Argument a) (Argument identity))) ∷ Constructor name (Product (Argument a) (Argument (args → args))))) ∷ t args)
-else instance genericFreeConstructorSingleFunArg ::
+else instance genericFreeConstructorNoParamEff ::
   ( IsSymbol name
   , Row.Cons name (Free t args) rin rout
   , Row.Lacks name rin
@@ -71,6 +71,35 @@ else instance genericFreeConstructorSingleFunArg ::
   genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
     where
     f = liftF $ (Generics.Rep.to (reconstructGeneric p ((Constructor (Argument identity)) ∷ Constructor name (Argument (args → args)))) ∷ t args)
+else instance genericFreeConstructorThreeParamUnitEff ::
+  ( IsSymbol name
+  , Row.Cons name (a → b → Free t args) rin rout
+  , Row.Lacks name rin
+  , ReconstructGeneric p (Constructor name (Product (Argument a) (Product (Argument b) (Argument Unit)))) g'
+  , Generic (t args) g'
+  ) =>
+  GenericFreeConstructor t (Constructor name (Product (Argument a) (Product (Argument b) (Argument Unit)))) p rin rout where
+  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
+    where
+    f a b = liftF $ (Generics.Rep.to (reconstructGeneric p ((Constructor (Product (Argument a) (Product (Argument b) (Argument unit)))) ∷ Constructor name (Product (Argument a) (Product (Argument b) (Argument Unit))))) ∷ t args)
+else instance genericFreeConstructorFourParamsUnitEff ::
+  ( IsSymbol name
+  , Row.Cons name (a → b → c → Free t args) rin rout
+  , Row.Lacks name rin
+  , ReconstructGeneric p (Constructor name (Product (Argument a) (Product (Argument b) (Product (Argument c) (Argument Unit))))) g'
+  , Generic (t args) g'
+  ) =>
+  GenericFreeConstructor t (Constructor name (Product (Argument a) (Product (Argument b) (Product (Argument c) (Argument Unit))))) p rin rout where
+  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
+    where
+    f a b c =
+      liftF
+        $ Generics.Rep.to
+        $ reconstructGeneric p
+        $ build a b c
+
+    build ∷ a → b → c → Constructor name (Product (Argument a) (Product (Argument b) (Product (Argument c) (Argument Unit))))
+    build a b c = Constructor $ Product (Argument a) $ Product (Argument b) $ Product (Argument c) (Argument unit)
 
 constructors ∷ ∀ g rout t. Generic (t Unit) g ⇒ GenericFreeConstructor t g Top () rout ⇒ FProxy t → { | rout }
 constructors fp = genericFreeConstructor fp (Proxy ∷ Proxy g) (PProxy ∷ PProxy Top) {}
@@ -78,9 +107,9 @@ constructors fp = genericFreeConstructor fp (Proxy ∷ Proxy g) (PProxy ∷ PPro
 -- | Functor definition
 data S3SquirrelProgramF a
   = GetETagHeaderForResource String (String → a)
-  -- | DownloadResourceToFile String String a
+  | DownloadResourceToFile String String a
   | ReadFileToBuffer String (Int → a)
-  -- | UploadObjectToS3 String String Buffer a
+  | UploadObjectToS3 String String Int a
   | GenerateUUID (String → a)
 
 -- | `Generic` instance is required
@@ -88,8 +117,10 @@ derive instance genericS3SquirrelProgramF ∷ Generic (S3SquirrelProgramF a) _
 
 -- | This signature is optional
 y ∷
-  { "GenerateUUID" ∷ Free S3SquirrelProgramF String
-  , "GetETagHeaderForResource" ∷ String → Free S3SquirrelProgramF String
-  , "ReadFileToBuffer" ∷ String → Free S3SquirrelProgramF Int
+  { "DownloadResourceToFile" :: String -> String -> Free S3SquirrelProgramF Unit
+  , "GenerateUUID" :: Free S3SquirrelProgramF String
+  , "GetETagHeaderForResource" :: String -> Free S3SquirrelProgramF String
+  , "ReadFileToBuffer" :: String -> Free S3SquirrelProgramF Int
+  , "UploadObjectToS3" :: String -> String -> Int -> Free S3SquirrelProgramF Unit
   }
 y = constructors (FProxy ∷ FProxy S3SquirrelProgramF)
