@@ -70,9 +70,7 @@ derive instance genericS3SquirrelProgramF ∷ Generic (S3SquirrelProgramF a) _
 constructors ∷ ∀ g rout t. Generic (t Unit) g ⇒ GenericFreeConstructor t g Top () rout ⇒ FProxy t → { | rout }
 constructors fp = genericFreeConstructor fp (Proxy ∷ Proxy g) (PProxy ∷ PProxy Top) {}
 
-x :: Free S3SquirrelProgramF String
-x = Record.get (SProxy ∷ SProxy "GenerateUUID") (constructors (FProxy ∷ FProxy S3SquirrelProgramF))
-
+-- | This signature is optional
 y ::
   { "GenerateUUID" :: Free S3SquirrelProgramF String
   , "GetRandomInt" :: Free S3SquirrelProgramF Int
