@@ -22,7 +22,7 @@ foreign import data Inr ∷ ConstructorPath → ConstructorPath
 data PProxy (path ∷ ConstructorPath)
   = PProxy
 
-class ReconstructGeneric (path ∷ ConstructorPath) a g | path a -> g where
+class ReconstructGeneric (path ∷ ConstructorPath) a g | path a → g where
   reconstructGeneric ∷ PProxy path → a → g
 
 instance reconstructGenericTop ∷ ReconstructGeneric Top a a where
@@ -37,7 +37,7 @@ else instance reconstructGenericInr ∷
   reconstructGeneric _ a = reconstructGeneric (PProxy ∷ PProxy p) (Inr a ∷ Sum t a)
 
 class GenericFreeConstructor (t ∷ Type → Type) g (p ∷ ConstructorPath) rin rout | t g → rin rout p where
-  genericFreeConstructor :: FProxy t → Proxy g → PProxy p → { | rin } → { | rout }
+  genericFreeConstructor ∷ FProxy t → Proxy g → PProxy p → { | rin } → { | rout }
 
 instance genericFreeConstructorSum ::
   ( GenericFreeConstructor t l (Inl p) rin lout
@@ -51,7 +51,7 @@ instance genericFreeConstructorSum ::
     rout = genericFreeConstructor fp (Proxy ∷ Proxy r) (PProxy ∷ PProxy (Inr p)) lout
 else instance genericFreeConstructorTwoFunArgs ::
   ( IsSymbol name
-  , Row.Cons name (a -> Free t args) rin rout
+  , Row.Cons name (a → Free t args) rin rout
   , Row.Lacks name rin
   , ReconstructGeneric p (Constructor name (Product (Argument a) (Argument (args → args)))) g'
   , Generic (t args) g'
@@ -77,18 +77,19 @@ constructors fp = genericFreeConstructor fp (Proxy ∷ Proxy g) (PProxy ∷ PPro
 
 -- | Functor definition
 data S3SquirrelProgramF a
-  = GetETagHeaderForResource String (String -> a)
+  = GetETagHeaderForResource String (String → a)
   -- | DownloadResourceToFile String String a
-  -- | ReadFileToBuffer String (Buffer -> a)
+  | ReadFileToBuffer String (Int → a)
   -- | UploadObjectToS3 String String Buffer a
-  | GenerateUUID (String -> a)
+  | GenerateUUID (String → a)
 
 -- | `Generic` instance is required
 derive instance genericS3SquirrelProgramF ∷ Generic (S3SquirrelProgramF a) _
 
 -- | This signature is optional
-y ::
-  { "GenerateUUID" :: Free S3SquirrelProgramF String
-  , "GetETagHeaderForResource" :: String -> Free S3SquirrelProgramF String
+y ∷
+  { "GenerateUUID" ∷ Free S3SquirrelProgramF String
+  , "GetETagHeaderForResource" ∷ String → Free S3SquirrelProgramF String
+  , "ReadFileToBuffer" ∷ String → Free S3SquirrelProgramF Int
   }
-y = (constructors (FProxy ∷ FProxy S3SquirrelProgramF))
+y = constructors (FProxy ∷ FProxy S3SquirrelProgramF)
