@@ -1,5 +1,6 @@
 module Test.RunCodegen where
 
+import Prelude
 import Control.Monad.Free (Free, liftF)
 import Data.Functor.Variant (FProxy(..))
 import Data.Generic.Rep (class Generic, Argument(..), Constructor(..), Product(..), Sum(..))
@@ -7,9 +8,30 @@ import Data.Generic.Rep (to) as Generics.Rep
 import Data.Symbol (class IsSymbol)
 import Prelude (Unit, identity, unit, ($))
 import Prim.Row (class Cons, class Lacks) as Row
+import Prim.Symbol (class Append, class Cons) as Symbol
 import Record (insert) as Record
 import Type.Prelude (SProxy(..))
 import Type.Proxy (Proxy(..))
+
+class LowerFirst (i ∷ Symbol) (o ∷ Symbol) | i → o
+
+instance lowerFirst ∷
+  ( Symbol.Cons l s i
+  , LowerCase l l'
+  , Symbol.Cons l' s o
+  ) ⇒
+  LowerFirst i o
+
+-- | TODO: Handles only symbols required by the example below ;-)
+class LowerCase (i ∷ Symbol) (o ∷ Symbol) | i → o
+
+instance lowerCaseD ∷ LowerCase "D" "d"
+
+instance lowerCaseG ∷ LowerCase "G" "g"
+
+instance lowerCaseR ∷ LowerCase "R" "r"
+
+instance lowerCaseU ∷ LowerCase "U" "u"
 
 foreign import kind ConstructorPath
 
@@ -50,47 +72,55 @@ instance genericFreeConstructorSum ::
 
     rout = genericFreeConstructor fp (Proxy ∷ Proxy r) (PProxy ∷ PProxy (Inr p)) lout
 else instance genericFreeConstructorSingleParamEff ::
-  ( IsSymbol name
-  , Row.Cons name (a → Free t args) rin rout
-  , Row.Lacks name rin
+  ( LowerFirst name name'
+  , IsSymbol name'
+  , Row.Cons name' (a → Free t args) rin rout
+  , Row.Lacks name' rin
+  , IsSymbol name
   , ReconstructGeneric p (Constructor name (Product (Argument a) (Argument (args → args)))) g'
   , Generic (t args) g'
   ) =>
   GenericFreeConstructor t (Constructor name (Product (Argument a) (Argument (args' → Unit)))) p rin rout where
-  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
+  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name') f rin
     where
     f a = liftF $ (Generics.Rep.to (reconstructGeneric p ((Constructor (Product (Argument a) (Argument identity))) ∷ Constructor name (Product (Argument a) (Argument (args → args))))) ∷ t args)
 else instance genericFreeConstructorNoParamEff ::
-  ( IsSymbol name
-  , Row.Cons name (Free t args) rin rout
-  , Row.Lacks name rin
+  ( LowerFirst name name'
+  , IsSymbol name'
+  , Row.Cons name' (Free t args) rin rout
+  , Row.Lacks name' rin
+  , IsSymbol name
   , ReconstructGeneric p (Constructor name (Argument (args → args))) g'
   , Generic (t args) g'
   ) =>
   GenericFreeConstructor t (Constructor name (Argument (args' → Unit))) p rin rout where
-  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
+  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name') f rin
     where
     f = liftF $ (Generics.Rep.to (reconstructGeneric p ((Constructor (Argument identity)) ∷ Constructor name (Argument (args → args)))) ∷ t args)
 else instance genericFreeConstructorThreeParamUnitEff ::
-  ( IsSymbol name
-  , Row.Cons name (a → b → Free t args) rin rout
-  , Row.Lacks name rin
+  ( LowerFirst name name'
+  , IsSymbol name'
+  , Row.Cons name' (a → b → Free t args) rin rout
+  , Row.Lacks name' rin
+  , IsSymbol name
   , ReconstructGeneric p (Constructor name (Product (Argument a) (Product (Argument b) (Argument Unit)))) g'
   , Generic (t args) g'
   ) =>
   GenericFreeConstructor t (Constructor name (Product (Argument a) (Product (Argument b) (Argument Unit)))) p rin rout where
-  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
+  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name') f rin
     where
     f a b = liftF $ (Generics.Rep.to (reconstructGeneric p ((Constructor (Product (Argument a) (Product (Argument b) (Argument unit)))) ∷ Constructor name (Product (Argument a) (Product (Argument b) (Argument Unit))))) ∷ t args)
 else instance genericFreeConstructorFourParamsUnitEff ::
-  ( IsSymbol name
-  , Row.Cons name (a → b → c → Free t args) rin rout
-  , Row.Lacks name rin
+  ( LowerFirst name name'
+  , IsSymbol name'
+  , Row.Cons name' (a → b → c → Free t args) rin rout
+  , Row.Lacks name' rin
+  , IsSymbol name
   , ReconstructGeneric p (Constructor name (Product (Argument a) (Product (Argument b) (Product (Argument c) (Argument Unit))))) g'
   , Generic (t args) g'
   ) =>
   GenericFreeConstructor t (Constructor name (Product (Argument a) (Product (Argument b) (Product (Argument c) (Argument Unit))))) p rin rout where
-  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name) f rin
+  genericFreeConstructor _ _ p rin = Record.insert (SProxy ∷ SProxy name') f rin
     where
     f a b c =
       liftF
@@ -116,11 +146,16 @@ data S3SquirrelProgramF a
 derive instance genericS3SquirrelProgramF ∷ Generic (S3SquirrelProgramF a) _
 
 -- | This signature is optional
-y ∷
-  { "DownloadResourceToFile" :: String -> String -> Free S3SquirrelProgramF Unit
-  , "GenerateUUID" :: Free S3SquirrelProgramF String
-  , "GetETagHeaderForResource" :: String -> Free S3SquirrelProgramF String
-  , "ReadFileToBuffer" :: String -> Free S3SquirrelProgramF Int
-  , "UploadObjectToS3" :: String -> String -> Int -> Free S3SquirrelProgramF Unit
+c ::
+  { downloadResourceToFile :: String -> String -> Free S3SquirrelProgramF Unit
+  , generateUUID :: Free S3SquirrelProgramF String
+  , getETagHeaderForResource :: String -> Free S3SquirrelProgramF String
+  , readFileToBuffer :: String -> Free S3SquirrelProgramF Int
+  , uploadObjectToS3 :: String -> String -> Int -> Free S3SquirrelProgramF Unit
   }
-y = constructors (FProxy ∷ FProxy S3SquirrelProgramF)
+c = constructors (FProxy ∷ FProxy S3SquirrelProgramF)
+
+program = do
+  c.downloadResourceToFile "https://example.com" "test"
+  uuid ← c.generateUUID
+  c.uploadObjectToS3 "foo" "bar" 8
