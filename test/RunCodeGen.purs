@@ -142,17 +142,10 @@ data S3SquirrelProgramF a
   | UploadObjectToS3 String String Int a
   | GenerateUUID (String → a)
 
--- | `Generic` instance is required
+derive instance functorS3SquirrelProgramF ∷ Functor S3SquirrelProgramF
+
 derive instance genericS3SquirrelProgramF ∷ Generic (S3SquirrelProgramF a) _
 
--- | This signature is optional
-c ::
-  { downloadResourceToFile :: String -> String -> Free S3SquirrelProgramF Unit
-  , generateUUID :: Free S3SquirrelProgramF String
-  , getETagHeaderForResource :: String -> Free S3SquirrelProgramF String
-  , readFileToBuffer :: String -> Free S3SquirrelProgramF Int
-  , uploadObjectToS3 :: String -> String -> Int -> Free S3SquirrelProgramF Unit
-  }
 c = constructors (FProxy ∷ FProxy S3SquirrelProgramF)
 
 program = do
